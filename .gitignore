@@ -1,0 +1,79 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+main
+gateway
+profile-service
+feed-service
+connections-service
+notification-service
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.env
+
+# Firebase service account keys - CRITICAL: Never commit these!
+*serviceAccountKey.json
+*serviceaccount*.json
+*firebase*.json
+credentials.json
+trustlink-*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs - prevent log files from being committed
+*.log
+logs/
+nohup.out
+gateway.log
+profile.log
+feed.log
+connections.log
+notification.log
+gateway-new.log
+
+# Build artifacts
+tmp/
+.air.toml
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Coverage reports
+coverage.txt
+coverage.html
+*.coverprofile
+

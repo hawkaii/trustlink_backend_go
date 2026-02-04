@@ -1,0 +1,10 @@
+go 1.21
+
+use (
+	./common
+	./gateway
+	./profile-service
+	./feed-service
+	./connections-service
+	./notification-service
+)
