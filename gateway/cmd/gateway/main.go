@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/trustlink/common/firebaseapp"
 	"github.com/trustlink/common/firestoredb"
 	"github.com/trustlink/common/httpx"
@@ -45,6 +46,11 @@ func main() {
 	defer firestoredb.Close()
 	log.Info("Firestore initialized successfully")
 
+	// Initialize GCS (optional — upload presign endpoint only)
+	if err := initGCS(ctx); err != nil {
+		log.Warn("GCS initialization skipped", zap.Error(err))
+	}
+
 	// Setup router
 	r := chi.NewRouter()
 
@@ -55,20 +61,22 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	// CORS is handled by Caddy reverse proxy in production
-	// Uncomment for local development without Caddy
-	// r.Use(cors.Handler(cors.Options{
-	// 	AllowedOrigins:   getAllowedOrigins(),
-	// 	AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-	// 	AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-	// 	ExposedHeaders:   []string{"Link"},
-	// 	AllowCredentials: true,
-	// 	MaxAge:           300,
-	// }))
+	// CORS — enabled for development (Caddy handles this in prod)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   getAllowedOrigins(),
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 
 	// Health check
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		httpx.Success(w, map[string]string{"status": "ok"})
+	})
+	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		httpx.Success(w, map[string]string{"status": "ready"})
 	})
 
 	// Service proxy routes
@@ -77,6 +85,9 @@ func main() {
 	connectionsURL := getServiceURL("CONNECTIONS_SERVICE_URL", "http://localhost:8083")
 
 	r.Route("/v1", func(r chi.Router) {
+		// Upload presign endpoint (handled before proxy routes)
+		r.Post("/uploads/presign", handlePresignUpload)
+
 		r.Handle("/profile/*", createProxy(profileURL))
 		r.Handle("/posts/*", createProxy(feedURL))
 		r.Handle("/posts", createProxy(feedURL))
@@ -149,6 +160,6 @@ func getServiceURL(envKey, fallback string) string {
 }
 
 func getAllowedOrigins() []string {
-	origins := getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://10.0.2.2:8080")
+	origins := getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://10.0.2.2:8080,http://35.253.120.86:8080")
 	return strings.Split(origins, ",")
 }
