@@ -16,24 +16,26 @@ var (
 )
 
 // Initialize initializes the Firebase Admin SDK
+// Tries GOOGLE_APPLICATION_CREDENTIALS if set, otherwise falls back to ADC
 func Initialize(ctx context.Context) error {
 	projectID := os.Getenv("FIREBASE_PROJECT_ID")
 	if projectID == "" {
 		return fmt.Errorf("FIREBASE_PROJECT_ID environment variable not set")
 	}
 
-	credPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if credPath == "" {
-		return fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
-	}
-
-	opt := option.WithCredentialsFile(credPath)
 	config := &firebase.Config{
 		ProjectID: projectID,
 	}
 
+	credPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	var err error
-	App, err = firebase.NewApp(ctx, config, opt)
+
+	if credPath != "" {
+		App, err = firebase.NewApp(ctx, config, option.WithCredentialsFile(credPath))
+	} else {
+		App, err = firebase.NewApp(ctx, config)
+	}
+
 	if err != nil {
 		return fmt.Errorf("error initializing Firebase app: %w", err)
 	}

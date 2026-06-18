@@ -1,5 +1,5 @@
 services:
-  # Gateway Service - Main entry point
+  # Gateway Service - Monolith serving profile, feed, and uploads
   gateway:
     build:
       context: .
@@ -7,92 +7,16 @@ services:
     container_name: trustlink-gateway
     restart: unless-stopped
     ports:
-      - "80:8080"    # HTTP (direct for dev, Caddy handles in prod)
-      - "8080:8080"  # Direct port access
+      - "80:8080"
+      - "8080:8080"
     environment:
       - GATEWAY_PORT=8080
-      - PROFILE_SERVICE_URL=http://profile-service:8081
-      - FEED_SERVICE_URL=http://feed-service:8082
-      - CONNECTIONS_SERVICE_URL=http://connections-service:8083
-      - GOOGLE_APPLICATION_CREDENTIALS=/credentials/firebase-key.json
       - FIREBASE_PROJECT_ID=trustlink-1bae8
       - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://10.0.2.2:8080,http://35.253.120.86:8080,http://35.253.120.86
       - ENV=dev
-      - GCS_CREDENTIALS=/credentials/gcs-key.json
-    volumes:
-      - ./credentials/firebase-key.json:/credentials/firebase-key.json:ro
-      - ./credentials/gcs-key.json:/credentials/gcs-key.json:ro
     networks:
       - trustlink-network
-
-  # Profile Service - User profile management
-  profile-service:
-    build:
-      context: .
-      dockerfile: profile-service/Dockerfile
-    container_name: trustlink-profile-service
-    restart: unless-stopped
-    expose:
-      - "8081"
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/credentials/firebase-key.json
-      - FIREBASE_PROJECT_ID=trustlink-1bae8
-      - PROFILE_SERVICE_PORT=8081
-      - ENV=dev
-    volumes:
-      - ./credentials/firebase-key.json:/credentials/firebase-key.json:ro
-    networks:
-      - trustlink-network
-
-  # Feed Service - Posts and feed management
-  feed-service:
-    build:
-      context: .
-      dockerfile: feed-service/Dockerfile
-    container_name: trustlink-feed-service
-    restart: unless-stopped
-    expose:
-      - "8082"
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/credentials/firebase-key.json
-      - FIREBASE_PROJECT_ID=trustlink-1bae8
-      - FEED_SERVICE_PORT=8082
-      - ENV=dev
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-    volumes:
-      - ./credentials/firebase-key.json:/credentials/firebase-key.json:ro
-    networks:
-      - trustlink-network
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  # RabbitMQ - Message broker for feed events
-  rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: trustlink-rabbitmq
-    restart: unless-stopped
-    expose:
-      - "5672"
-      - "15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - trustlink-network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
 networks:
   trustlink-network:
     driver: bridge
-
-volumes:
-  rabbitmq_data:
-    driver: local

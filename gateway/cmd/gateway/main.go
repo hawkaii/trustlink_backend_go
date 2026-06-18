@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -15,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/trustlink/common/authmw"
 	"github.com/trustlink/common/firebaseapp"
 	"github.com/trustlink/common/firestoredb"
 	"github.com/trustlink/common/httpx"
@@ -79,19 +78,24 @@ func main() {
 		httpx.Success(w, map[string]string{"status": "ready"})
 	})
 
-	// Service proxy routes
-	profileURL := getServiceURL("PROFILE_SERVICE_URL", "http://localhost:8081")
-	feedURL := getServiceURL("FEED_SERVICE_URL", "http://localhost:8082")
-	connectionsURL := getServiceURL("CONNECTIONS_SERVICE_URL", "http://localhost:8083")
-
+	// API routes
 	r.Route("/v1", func(r chi.Router) {
-		// Upload presign endpoint (handled before proxy routes)
+		// Upload presign endpoint
 		r.Post("/uploads/presign", handlePresignUpload)
 
-		r.Handle("/profile/*", createProxy(profileURL))
-		r.Handle("/posts/*", createProxy(feedURL))
-		r.Handle("/posts", createProxy(feedURL))
-		r.Handle("/connections/*", createProxy(connectionsURL))
+		// Profile routes (protected)
+		r.Route("/profile", func(r chi.Router) {
+			r.Use(authmw.AuthMiddleware)
+			r.Get("/me", handleGetProfile)
+			r.Patch("/me", handleUpdateProfile)
+		})
+
+		// Post routes (protected)
+		r.Route("/posts", func(r chi.Router) {
+			r.Use(authmw.AuthMiddleware)
+			r.Post("/", handleCreatePost)
+			r.Get("/", handleGetPosts)
+		})
 	})
 
 	// Start server
@@ -129,34 +133,11 @@ func main() {
 	log.Info("Gateway stopped")
 }
 
-func createProxy(targetURL string) http.Handler {
-	target, _ := url.Parse(targetURL)
-	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Don't strip prefix, just forward the request as-is
-		r.URL.Host = target.Host
-		r.URL.Scheme = target.Scheme
-		r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
-		r.Host = target.Host
-
-		log.Debug("Proxying request",
-			zap.String("original_path", r.URL.Path),
-			zap.String("target", targetURL))
-
-		proxy.ServeHTTP(w, r)
-	})
-}
-
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return fallback
-}
-
-func getServiceURL(envKey, fallback string) string {
-	return getEnv(envKey, fallback)
 }
 
 func getAllowedOrigins() []string {
