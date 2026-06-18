@@ -19,14 +19,13 @@ func Initialize(ctx context.Context) error {
 	}
 
 	credPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if credPath == "" {
-		return fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
-	}
-
-	opt := option.WithCredentialsFile(credPath)
 
 	var err error
-	Client, err = firestore.NewClient(ctx, projectID, opt)
+	if credPath != "" {
+		Client, err = firestore.NewClient(ctx, projectID, option.WithCredentialsFile(credPath))
+	} else {
+		Client, err = firestore.NewClient(ctx, projectID)
+	}
 	if err != nil {
 		return fmt.Errorf("error initializing Firestore client: %w", err)
 	}
